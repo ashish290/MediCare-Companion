@@ -1,4 +1,4 @@
-# MediBuddy
+# MediCare Companion
 
 A medication reminder app that helps patients track daily medications and notifies caretakers when doses are missed.
 
