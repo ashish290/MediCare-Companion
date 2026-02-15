@@ -45,7 +45,7 @@ Open [http://localhost:5173](http://localhost:5173)
 
 ## Project Structure
 
-```
+````
 src/
 ├── components/
 │   ├── ui/              # Reusable UI primitives (Button, Card, Dialog, etc.)
@@ -56,69 +56,43 @@ src/
 ├── hooks/               # React Query hooks + Auth context
 ├── services/            # API abstraction (medication, log, auth services)
 ├── schemas/             # Zod validation schemas
-├── types/               # TypeScript interfaces
-├── lib/                 # Supabase client, utils, constants
-├── pages/               # AuthPage, DashboardPage
-└── main.tsx
-```
+### 2. Database Setup (Supabase)
 
-## Database Schema
+1.  Create a new Supabase project.
+2.  Go to the **SQL Editor** in your Supabase Dashboard.
+3.  Copy and run the contents of `supabase/migrations/001_initial_schema.sql` to set up tables and security policies.
+4.  Copy and run `supabase/migrations/002_missed_medications_rpc.sql` to enable the missed medication detection logic.
 
-- **profiles** — extends Supabase auth.users with caretaker email and timezone
-- **medications** — name, dosage, scheduled time per user
-- **medication_logs** — daily tracking with unique constraint per medication per day
+### 3. Edge Function & Email Notifications
 
-All tables have Row Level Security (RLS) enforcing `auth.uid() = user_id`.
+To enable the automated caretaker emails:
 
-## Missed Medication Detection
+1.  **Install Supabase CLI**: `npm install -g supabase`
+2.  **Login**: `npx supabase login`
+3.  **Link Project**:
+    ```bash
+    npx supabase link --project-ref your_project_ref
+    ```
+4.  **Set Secrets**:
+    ```bash
+    npx supabase secrets set RESEND_API_KEY=re_123456...
+    ```
+5.  **Deploy Function**:
+    ```bash
+    npx supabase functions deploy check-missed-medications
+    ```
 
-A Supabase Edge Function (`supabase/functions/check-missed-medications/`) runs on a cron schedule to:
+### 4. Cron Job Automation
 
-1. Query medications without a log entry for today
-2. Group missed medications by caretaker
-3. Send email notifications via Resend API
+To schedule the system to check for missed medications every hour:
 
-### Deploy the Edge Function
-
-```bash
-supabase functions deploy check-missed-medications
-```
-
-Set the cron schedule in Supabase Dashboard → Edge Functions → Schedules:
-
-```
-1 21 * * *    # runs at 9:01 PM UTC daily
-```
-
-Set secrets:
-
-```bash
-supabase secrets set RESEND_API_KEY=your_resend_key
-```
-
-## Cron Job Setup (Daily Missed Medication Check)
-
-To enable the automatic check for missed medications, you need to set up a Cron Job in your Supabase database.
-
-1.  **Get your Project URL and Anon Key**:
-    - Go to Supabase Dashboard -> **Settings** -> **API**.
-    - Cop your `Project URL` (e.g., `https://xyz.supabase.co`) and `anon` key.
-
-2.  **Enable Extensions**:
-    - Go to **Database** -> **Extensions**.
-    - Search for `pg_cron` and enable it.
-    - Search for `pg_net` and enable it.
-
-3.  **Run the Schedule SQL**:
-    - Go to **SQL Editor** -> **New Query**.
-    - Copy the content of `supabase/migrations/003_cron_schedule.sql`.
-    - **IMPORTANT**: Replace `YOUR_ANON_KEY` in the SQL with your actual `anon` key.
-    - Click **Run**.
+1.  Enable `pg_cron` and `pg_net` extensions in Supabase (Database -> Extensions).
+2.  Run the following SQL in your content editor (replace `YOUR_ANON_KEY` with your actual key from `.env.local`):
 
     ```sql
     select cron.schedule(
       'missed-med-check',
-      '0 * * * *',  -- runs every hour. Change to '0 21 * * *' for daily at 9pm
+      '0 * * * *', -- Runs every hour
       $$
       select
         net.http_post(
@@ -129,17 +103,28 @@ To enable the automatic check for missed medications, you need to set up a Cron 
     );
     ```
 
-4.  **Verify it's running**:
-    - Go to **Table Editor** -> `cron.job` (in the `cron` schema) to see your scheduled job.
-    - Go to **Database** -> **Postgres Logs** to see execution logs.
+---
 
-## Deployment (Vercel)
+## 📦 Deployment
+
+The frontend is optimized for deployment on Vercel or Netlify.
+
+**Build for production:**
 
 ```bash
 npm run build
-```
+````
 
-1. Push to GitHub
-2. Import in [Vercel](https://vercel.com)
-3. Add environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-4. Deploy
+This generates a `dist` folder ready for static hosting.
+
+---
+
+## 🛡️ Security
+
+- **Row Level Security (RLS)**: Enabled on all tables. Users can only access and modify their own data.
+- **Secure API Calls**: Edge Functions typically require a valid Service Role or JWT token for execution.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+ITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` 4. Deploy

@@ -33,21 +33,17 @@ Deno.serve(async () => {
       );
     }
 
-    // Log the missed medications instead of emailing
-    console.log(`Found ${rows.length} users with missed medications:`);
-    rows.forEach((row) => {
-      console.log(
-        `[MISSED] Patient: ${row.full_name} (${row.patient_email}) | Caretaker: ${row.caretaker_email} | Meds: ${row.missed_medications.join(", ")}`,
-      );
-    });
-
-    return new Response(
-      JSON.stringify({
-        message: "Logged missed medications",
-        count: rows.length,
-      }),
-      { status: 200 },
+    // send an email for each user with missed meds
+    const results = await Promise.allSettled(
+      rows.map((row) => sendNotification(row)),
     );
+
+    const sent = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
+
+    return new Response(JSON.stringify({ sent, failed, total: rows.length }), {
+      status: 200,
+    });
   } catch (err) {
     console.error("Edge function error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
@@ -55,3 +51,39 @@ Deno.serve(async () => {
     });
   }
 });
+
+async function sendNotification(row: MissedMedRow): Promise<void> {
+  const { caretaker_email, full_name, missed_medications } = row;
+
+  if (!caretaker_email) return;
+
+  const medList = missed_medications.map((m) => `<li>${m}</li>`).join("");
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "MediBuddy <noreply@yourdomain.com>",
+      to: caretaker_email,
+      subject: `⚠️ ${full_name || "Your patient"} missed medications today`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2>Medication Reminder</h2>
+          <p><strong>${full_name || "Your patient"}</strong> has not taken the following medications today:</p>
+          <ul>${medList}</ul>
+          <p style="color: #666; font-size: 14px;">
+            This is an automated notification from MediBuddy.
+          </p>
+        </div>
+      `,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Resend API error: ${response.status} - ${body}`);
+  }
+}
