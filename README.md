@@ -1,4 +1,4 @@
-# MediBuddy
+# MediCare Companion
 
 A medication reminder app that helps patients track daily medications and notifies caretakers when doses are missed.
 
@@ -9,7 +9,7 @@ A medication reminder app that helps patients track daily medications and notifi
 - **State**: React Query (TanStack Query) with optimistic updates
 - **Forms**: React Hook Form + Zod validation
 - **Backend**: Supabase (Auth + Postgres + RLS)
-- **Notifications**: Supabase Edge Functions + Resend
+- **Notifications**: Supabase Edge Functions(Corn-Job)
 
 ## Getting Started
 
